@@ -1,0 +1,1578 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "notice": ""
+      },
+      "id": "296f1a2f-6a81-44be-8491-4ee0e6815049",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        1360
+      ]
+    },
+    {
+      "parameters": {
+        "splitInBatchesNotice": "",
+        "batchSize": 3,
+        "options": {}
+      },
+      "id": "5d9e8b79-71ee-4854-bfca-69bb564f3928",
+      "name": "Batch Processor",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        2920,
+        800
+      ]
+    },
+    {
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": 2,
+        "unit": "seconds"
+      },
+      "id": "4e15a19b-6f27-40cc-a3c2-23018e5a9bf1",
+      "name": "Rate Limit Wait",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        840
+      ],
+      "webhookId": "YOUR_WEBHOOK_ID"
+    },
+    {
+      "parameters": {},
+      "id": "07323e15-f5d2-4f39-a9f2-5e09719ffa41",
+      "name": "Loop Back for Batch",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2700,
+        680
+      ]
+    },
+    {
+      "parameters": {
+        "notice": ""
+      },
+      "id": "ee23f6de-1b6e-4459-8093-247a3ce18899",
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        1820
+      ]
+    },
+    {
+      "parameters": {
+        "executeOnce": true,
+        "command": "=echo '{\"timestamp\":\"{{$now.toISO()}}\",\"error\":\"{{$json.error?.message || 'Unknown error'}}\",\"node\":\"{{$json.error?.node || 'Unknown'}}\"}' >> /files/logs/genre_errors.jsonl"
+      },
+      "id": "dca32131-7d59-48f9-b440-863c95fe2f47",
+      "name": "Log Error",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        240,
+        1820
+      ]
+    },
+    {
+      "parameters": {
+        "multipleMethods": false,
+        "httpMethod": "POST",
+        "path": "ingest",
+        "authentication": "none",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "854f3449-0264-4794-8b10-1fd6e83dbefb",
+      "name": "Webhook Ingest",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        240
+      ],
+      "webhookId": "YOUR_WEBHOOK_ID"
+    },
+    {
+      "parameters": {
+        "notice": "",
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "213c252c-6ac3-462d-a60a-65e068fa18fc",
+      "name": "Schedule (Every 15 min)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "executeOnce": true,
+        "command": "mkdir -p /files/tmp /files/logs && echo 'ready'"
+      },
+      "id": "dd0fb0f0-8287-4399-92f8-09693399bbb2",
+      "name": "Ensure Directories",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        460,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const DEST_PREFIXES = ['/inflyteappfiltered', '/apps/musicsorted'];\nlet sortedNames = new Set();\ntry {\n sortedNames = new Set(\n $('List Sorted Files (Bulk)').all()\n .filter(i => {\n const p = (i.json.path_lower || i.json.path_display || '').toLowerCase();\n return DEST_PREFIXES.some(prefix => p.startsWith(prefix));\n })\n .map(i => (i.json.name || '').toLowerCase())\n );\n} catch (e) {\n sortedNames = new Set();\n}\nreturn $input.all().map(item => {\n const name = (item.json.name || '').toLowerCase();\n return { json: { ...item.json, matches: sortedNames.has(name) ? [{ name }] : [] } };\n});",
+        "notice": ""
+      },
+      "id": "f026d7ee-2788-468c-a3bf-16043ff50cd2",
+      "name": "Check Already Processed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        320
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.matches?.length || 0 }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              },
+              "id": "a7d5c476-33e1-4ac5-8bbb-ef4e7d31f1dd"
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": false,
+        "options": {}
+      },
+      "id": "f85fc78b-b999-4d33-b39f-baf4a6718ac2",
+      "name": "Skip If Duplicate",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1360,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "duplicateItem": false,
+        "jsonOutput": "={\n \"id\": \"{{ $json.id }}\",\n \"path_display\": \"{{ $json.path_display }}\",\n \"path_lower\": \"{{ $json.path_lower }}\",\n \"original_name\": \"{{ $json.name }}\",\n \"original_path\": \"{{ $json.path_lower }}\",\n \"file_size\": {{ $json.size || 0 }}\n}\n",
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "ba1e1b88-438c-4779-b39c-cc4cddb846d9",
+      "name": "Store Original Info",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1580,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "executeOnce": true,
+        "command": "=python3 /scripts/advanced_genre_detection.py \"/files/tmp/{{ $json.original_name }}\" 2>&1 || echo '{\"genre\":\"Unknown\",\"subgenre\":\"Unknown\",\"confidence\":0,\"source\":\"error\",\"bpm\":0,\"energy\":0}'"
+      },
+      "id": "1a7a3b32-883e-4f1b-acae-cf1789f2e7f7",
+      "name": "Python Genre Detection",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        2240,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "duplicateItem": false,
+        "jsonOutput": "={\n \"original_name\": \"{{ $('Store Original Info').item.json.original_name }}\",\n \"original_path\": \"{{ $('Store Original Info').item.json.original_path }}\",\n \"py_genre\": \"{{ JSON.parse($json.stdout || '{}').genre || 'Unknown' }}\",\n \"py_subgenre\": \"{{ JSON.parse($json.stdout || '{}').subgenre || 'Unknown' }}\",\n \"py_confidence\": {{ JSON.parse($json.stdout || '{}').confidence || 0 }},\n \"py_source\": \"{{ JSON.parse($json.stdout || '{}').source || 'unknown' }}\",\n \"bpm\": {{ JSON.parse($json.stdout || '{}').bpm || 0 }},\n \"energy\": {{ JSON.parse($json.stdout || '{}').energy || 0 }},\n \"artist\": \"{{ JSON.parse($json.stdout || '{}').artist || '' }}\",\n \"title\": \"{{ JSON.parse($json.stdout || '{}').title || '' }}\"\n}",
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "47f51489-5ea8-405e-9b34-f45c0ed8e44b",
+      "name": "Parse Python Output",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2480,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.py_confidence }}",
+              "rightValue": 0.6,
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              },
+              "id": "282dc80e-1719-44bb-923a-27f3e4369c51"
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": false,
+        "options": {}
+      },
+      "id": "92b7f0e8-5da8-47b2-948c-300f32fb2442",
+      "name": "Needs AI Assist?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2700,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "curlImport": "",
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "provideSslCertificates": false,
+        "sendQuery": false,
+        "sendHeaders": false,
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={\n \"model\": \"llama-3.3-70b-versatile\",\n \"temperature\": 0.2,\n \"response_format\": {\"type\": \"json_object\"},\n \"messages\": [\n {\n \"role\": \"system\",\n \"content\": \"You are a music curator. Return ONLY valid JSON with keys: ai_genre, ai_subgenre, ai_confidence (0-1), reasoning.\"\n },\n {\n \"role\": \"user\",\n \"content\": \"Classify this dance music track. Use broad electronic genres and a useful subgenre.\\n\\nFilename: {{$json.original_name || $json.name}}\\nArtist: {{$json.artist || ''}}\\nTitle: {{$json.title || ''}}\\nBPM: {{$json.bpm || 0}}\\nEnergy: {{$json.energy || 0}}\\nPython guess: {{$json.py_genre || $json.genre || 'Unknown'}} / {{$json.py_subgenre || $json.subgenre || 'Unknown'}} (confidence {{$json.py_confidence || $json.confidence || 0}})\\n\\nRespond with JSON only.\"\n }\n ]\n}",
+        "options": {
+          "timeout": 60000
+        },
+        "infoMessage": ""
+      },
+      "id": "b9f2914e-e735-44ed-863e-c9330a5db023",
+      "name": "Groq Genre Assist",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        0,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Header Auth account"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "duplicateItem": false,
+        "jsonOutput": "={\n \"original_name\": \"{{ $('Parse Python Output').item.json.original_name }}\",\n \"original_path\": \"{{ $('Parse Python Output').item.json.original_path }}\",\n \"py_genre\": \"{{ $('Parse Python Output').item.json.py_genre }}\",\n \"py_subgenre\": \"{{ $('Parse Python Output').item.json.py_subgenre }}\",\n \"py_confidence\": {{ $('Parse Python Output').item.json.py_confidence }},\n \"bpm\": {{ $('Parse Python Output').item.json.bpm }},\n \"energy\": {{ $('Parse Python Output').item.json.energy }},\n \"ai_genre\": \"{{ JSON.parse(($json.choices && $json.choices[0] && $json.choices[0].message && $json.choices[0].message.content) ? $json.choices[0].message.content : '{}').ai_genre || '' }}\",\n \"ai_subgenre\": \"{{ JSON.parse(($json.choices && $json.choices[0] && $json.choices[0].message && $json.choices[0].message.content) ? $json.choices[0].message.content : '{}').ai_subgenre || '' }}\",\n \"ai_confidence\": {{ JSON.parse(($json.choices && $json.choices[0] && $json.choices[0].message && $json.choices[0].message.content) ? $json.choices[0].message.content : '{}').ai_confidence || 0 }},\n \"ai_reasoning\": \"{{ JSON.parse(($json.choices && $json.choices[0] && $json.choices[0].message && $json.choices[0].message.content) ? $json.choices[0].message.content : '{}').reasoning || '' }}\",\n \"used_ai\": true\n}",
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "53da140b-1fce-4564-ac5a-253f9663a284",
+      "name": "Parse AI Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2920,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "duplicateItem": false,
+        "jsonOutput": "={\n \"original_name\": \"{{ $json.original_name }}\",\n \"original_path\": \"{{ $json.original_path }}\",\n \"py_genre\": \"{{ $json.py_genre }}\",\n \"py_subgenre\": \"{{ $json.py_subgenre }}\",\n \"py_confidence\": {{ $json.py_confidence }},\n \"bpm\": {{ $json.bpm }},\n \"energy\": {{ $json.energy }},\n \"ai_genre\": \"\",\n \"ai_subgenre\": \"\",\n \"ai_confidence\": 0,\n \"ai_reasoning\": \"\",\n \"used_ai\": false\n}",
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "094ab1ed-5f11-4956-bb0d-0dd677f5d4b3",
+      "name": "Skip AI (High Confidence)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2920,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Resolve final genre from Python detection and AI assist\nconst item = $input.first().json;\nconst pyGenre = item.py_genre || 'Unknown';\nconst pySubgenre = item.py_subgenre || 'Unknown';\nconst pyConf = item.py_confidence || 0;\nconst aiGenre = item.ai_genre || '';\nconst aiSubgenre = item.ai_subgenre || '';\nconst aiConf = item.ai_confidence || 0;\n\nlet finalGenre, finalSubgenre, finalConf, finalSource;\n\n// Decision logic: prefer higher confidence, AI wins ties if it was used\nif (aiConf > pyConf && aiGenre) {\n finalGenre = aiGenre;\n finalSubgenre = aiSubgenre || aiGenre;\n finalConf = aiConf;\n finalSource = 'openai';\n} else if (pyGenre && pyGenre !== 'Unknown') {\n finalGenre = pyGenre;\n finalSubgenre = pySubgenre;\n finalConf = pyConf;\n finalSource = item.used_ai ? 'python_preferred' : 'python';\n} else if (aiGenre) {\n finalGenre = aiGenre;\n finalSubgenre = aiSubgenre || aiGenre;\n finalConf = aiConf;\n finalSource = 'openai_fallback';\n} else {\n finalGenre = 'Unsorted';\n finalSubgenre = 'Unknown';\n finalConf = 0;\n finalSource = 'none';\n}\n\n// Determine confidence tier for folder routing\nlet confTier = 'low';\nif (finalConf >= 0.7) confTier = 'high';\nelse if (finalConf >= 0.4) confTier = 'medium';\n\n// Build target folder path\nlet targetFolder;\nif (confTier === 'high') {\n targetFolder = `/Apps/MusicSorted/${finalGenre}/${finalSubgenre}`;\n} else if (confTier === 'medium') {\n targetFolder = `/Apps/MusicSorted/${finalGenre}/_Needs Review`;\n} else {\n targetFolder = `/Apps/MusicSorted/_Manual Review`;\n}\n\nreturn [{\n json: { ...($input.first().json), \n ...item,\n final_genre: finalGenre,\n final_subgenre: finalSubgenre,\n final_confidence: finalConf,\n final_source: finalSource,\n confidence_tier: confTier,\n target_folder: targetFolder\n }\n}];",
+        "notice": ""
+      },
+      "id": "b15d6257-2e8c-4819-bfdc-f10f7bd62350",
+      "name": "Resolve Final Genre",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3360,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "curlImport": "",
+        "method": "POST",
+        "url": "https://api.dropboxapi.com/2/files/move_v2",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "dropboxOAuth2Api",
+        "provideSslCertificates": false,
+        "sendQuery": false,
+        "sendHeaders": false,
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ { from_path: $('Resolve Final Genre').item.json.original_path, to_path: ($('Resolve Final Genre').item.json.target_folder + '/' + $('Resolve Final Genre').item.json.original_name), autorename: true } }}",
+        "options": {},
+        "infoMessage": ""
+      },
+      "id": "c81d2d9a-3b49-4e0d-9dc4-d1d251df9039",
+      "name": "Move to Genre Folder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3820,
+        320
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "dropboxOAuth2Api": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Dropbox account"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "executeOnce": true,
+        "command": "=echo '{{ JSON.stringify({ timestamp: $now.toISO(), file: $json.original_name, genre: $json.final_genre, subgenre: $json.final_subgenre, confidence: $json.final_confidence, source: $json.final_source, tier: $json.confidence_tier, bpm: $json.bpm, energy: $json.energy, used_ai: $json.used_ai }) }}' >> /files/logs/genre_detection.jsonl"
+      },
+      "id": "e14bf67e-446b-4985-9b37-13efb22ad107",
+      "name": "Log to JSONL",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        4260,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "multipleMethods": false,
+        "httpMethod": "GET",
+        "path": "dashboard",
+        "authentication": "none",
+        "responseMode": "lastNode",
+        "responseData": "firstEntryJson",
+        "options": {}
+      },
+      "id": "8d662523-93ea-42a7-8a1f-5218bbf80ad3",
+      "name": "Dashboard Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        1600
+      ],
+      "webhookId": "YOUR_WEBHOOK_ID"
+    },
+    {
+      "parameters": {
+        "executeOnce": true,
+        "command": "cat /files/logs/genre_detection.jsonl 2>/dev/null || echo ''"
+      },
+      "id": "591fff96-4b10-4b06-9d8e-85c1d02241bd",
+      "name": "Read Log File",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        240,
+        1600
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const stdout = $input.first().json.stdout || '';\nconst lines = stdout.trim().split('\\n').filter(l => l.trim());\n\nconst records = [];\nfor (const line of lines) {\n try {\n const obj = JSON.parse(line);\n if (obj.genre) records.push(obj);\n } catch(e) {}\n}\n\n// Aggregate stats\nconst genreCounts = {};\nconst sourceCounts = {};\nconst tierCounts = { high: 0, medium: 0, low: 0 };\nlet totalBPM = 0, bpmCount = 0;\n\nfor (const r of records) {\n genreCounts[r.genre] = (genreCounts[r.genre] || 0) + 1;\n sourceCounts[r.source] = (sourceCounts[r.source] || 0) + 1;\n tierCounts[r.tier] = (tierCounts[r.tier] || 0) + 1;\n if (r.bpm > 0) { totalBPM += r.bpm; bpmCount++; }\n}\n\nconst avgBPM = bpmCount > 0 ? Math.round(totalBPM / bpmCount) : 0;\nconst genreLabels = Object.keys(genreCounts);\nconst genreData = genreLabels.map(k => genreCounts[k]);\n\nconst html = `<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n <meta charset=\"UTF-8\">\n <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n <title>DJ Genre Dashboard</title>\n <script src=\"https://cdn.jsdelivr.net/npm/chart.js\"></script>\n <style>\n * { box-sizing: border-box; }\n body { \n font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;\n background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);\n color: #eee;\n margin: 0;\n padding: 20px;\n min-height: 100vh;\n }\n .container { max-width: 1200px; margin: 0 auto; }\n h1 { \n text-align: center; \n margin-bottom: 30px;\n background: linear-gradient(90deg, #00d4ff, #7b2cbf);\n -webkit-background-clip: text;\n -webkit-text-fill-color: transparent;\n font-size: 2.5rem;\n }\n .stats-grid {\n display: grid;\n grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));\n gap: 20px;\n margin-bottom: 30px;\n }\n .stat-card {\n background: rgba(255,255,255,0.05);\n border-radius: 16px;\n padding: 24px;\n text-align: center;\n border: 1px solid rgba(255,255,255,0.1);\n }\n .stat-value {\n font-size: 2.5rem;\n font-weight: 700;\n background: linear-gradient(90deg, #00d4ff, #7b2cbf);\n -webkit-background-clip: text;\n -webkit-text-fill-color: transparent;\n }\n .stat-label { color: #888; margin-top: 8px; }\n .chart-container {\n background: rgba(255,255,255,0.05);\n border-radius: 16px;\n padding: 24px;\n margin-bottom: 20px;\n border: 1px solid rgba(255,255,255,0.1);\n }\n .recent-tracks {\n background: rgba(255,255,255,0.05);\n border-radius: 16px;\n padding: 24px;\n border: 1px solid rgba(255,255,255,0.1);\n }\n .track-row {\n display: flex;\n justify-content: space-between;\n padding: 12px 0;\n border-bottom: 1px solid rgba(255,255,255,0.05);\n }\n .track-row:last-child { border-bottom: none; }\n .track-name { color: #fff; }\n .track-genre { \n background: linear-gradient(90deg, #00d4ff, #7b2cbf);\n padding: 4px 12px;\n border-radius: 20px;\n font-size: 0.85rem;\n }\n .tier-badge {\n display: inline-block;\n padding: 2px 8px;\n border-radius: 10px;\n font-size: 0.75rem;\n margin-left: 8px;\n }\n .tier-high { background: #10b981; }\n .tier-medium { background: #f59e0b; }\n .tier-low { background: #ef4444; }\n </style>\n</head>\n<body>\n <div class=\"container\">\n <h1>\ud83c\udfa7 Genre Sorting Dashboard</h1>\n \n <div class=\"stats-grid\">\n <div class=\"stat-card\">\n <div class=\"stat-value\">${records.length}</div>\n <div class=\"stat-label\">Total Tracks</div>\n </div>\n <div class=\"stat-card\">\n <div class=\"stat-value\">${genreLabels.length}</div>\n <div class=\"stat-label\">Unique Genres</div>\n </div>\n <div class=\"stat-card\">\n <div class=\"stat-value\">${avgBPM}</div>\n <div class=\"stat-label\">Avg BPM</div>\n </div>\n <div class=\"stat-card\">\n <div class=\"stat-value\">${tierCounts.high}</div>\n <div class=\"stat-label\">High Confidence</div>\n </div>\n </div>\n\n <div class=\"chart-container\">\n <canvas id=\"genreChart\" height=\"100\"></canvas>\n </div>\n\n <div class=\"recent-tracks\">\n <h3>Recent Tracks</h3>\n ${records.slice(-10).reverse().map(r => `\n <div class=\"track-row\">\n <span class=\"track-name\">${r.file || 'Unknown'}</span>\n <span>\n <span class=\"track-genre\">${r.genre}${r.subgenre && r.subgenre !== r.genre ? ' / ' + r.subgenre : ''}</span>\n <span class=\"tier-badge tier-${r.tier || 'low'}\">${r.tier || 'unknown'}</span>\n </span>\n </div>\n `).join('')}\n </div>\n </div>\n\n <script>\n new Chart(document.getElementById('genreChart'), {\n type: 'doughnut',\n data: {\n labels: ${JSON.stringify(genreLabels)},\n datasets: [{\n data: ${JSON.stringify(genreData)},\n backgroundColor: [\n '#00d4ff', '#7b2cbf', '#10b981', '#f59e0b', '#ef4444',\n '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#f97316'\n ]\n }]\n },\n options: {\n responsive: true,\n plugins: {\n legend: { position: 'right', labels: { color: '#eee' } }\n }\n }\n });\n </script>\n</body>\n</html>`;\n\nreturn [{ json: { html } }];",
+        "notice": ""
+      },
+      "id": "65c75023-1e2c-4993-b231-139e0e9e3fe3",
+      "name": "Build Dashboard HTML",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        1600
+      ]
+    },
+    {
+      "parameters": {
+        "generalNotice": "",
+        "respondWith": "text",
+        "webhookNotice": "",
+        "responseBody": "={{ $json.html }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "id": "e18a4ebc-94b4-4409-96c1-e3d3d494f763",
+      "name": "Respond HTML",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        680,
+        1600
+      ]
+    },
+    {
+      "parameters": {
+        "curlImport": "",
+        "method": "POST",
+        "url": "https://api.dropboxapi.com/2/files/list_folder",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "dropboxOAuth2Api",
+        "provideSslCertificates": false,
+        "sendQuery": false,
+        "sendHeaders": false,
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "{\"path\":\"/Apps/InflyteApp\",\"recursive\":true,\"include_media_info\":false,\"include_deleted\":false,\"limit\":2000}",
+        "options": {},
+        "infoMessage": ""
+      },
+      "id": "4df5dae4-8859-4541-8dd5-f5d0757efc77",
+      "name": "List Dropbox Files1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        680,
+        320
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "dropboxOAuth2Api": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Dropbox account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.name }}",
+              "rightValue": "\\.(mp3|wav|flac|aiff|m4a)$",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              },
+              "id": "9ebb211c-3797-4da0-a21c-79c4a2fcc175"
+            },
+            {
+              "leftValue": "={{ $json['.tag'] }}",
+              "rightValue": "file",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "id": "2a437768-69cb-4731-a7c5-131fc2f544d8"
+            },
+            {
+              "leftValue": "={{ $json.size || 0 }}",
+              "rightValue": 524288000,
+              "operator": {
+                "type": "number",
+                "operation": "lte"
+              },
+              "id": "size-cap-added"
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": false,
+        "options": {}
+      },
+      "id": "c1ee886c-888e-4166-98bb-d4de05137de4",
+      "name": "Filter Audio Files1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        900,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "curlImport": "",
+        "method": "POST",
+        "url": "https://content.dropboxapi.com/2/files/download",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "dropboxOAuth2Api",
+        "provideSslCertificates": false,
+        "sendQuery": false,
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Dropbox-API-Arg",
+              "value": "={{ JSON.stringify({path: $json.id || $json.path_display || $json.path_lower || $json.original_path}) }}"
+            }
+          ]
+        },
+        "sendBody": false,
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": false,
+              "neverError": false,
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          },
+          "timeout": 30000
+        },
+        "infoMessage": ""
+      },
+      "id": "39e6ad8d-0280-4681-a98c-c413c3455ac9",
+      "name": "Download Audio1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1800,
+        240
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "notesInFlow": false,
+      "credentials": {
+        "dropboxOAuth2Api": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Dropbox account"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "fileName": "=/files/tmp/{{ $json.original_name }}",
+        "dataPropertyName": "data",
+        "options": {}
+      },
+      "id": "fb95af52-843e-4e31-9c04-3d7a322d51ed",
+      "name": "Write Temp File1",
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "typeVersion": 1,
+      "position": [
+        2020,
+        240
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "folder",
+        "operation": "create",
+        "path": "={{$json.target_folder || ('/Apps/MusicSorted/' + ($json.final_genre || $json.genre || 'Unclassified'))}}"
+      },
+      "id": "79f49af8-d426-40b8-b2b1-576c744e873f",
+      "name": "Create Genre Folder1",
+      "type": "n8n-nodes-base.dropbox",
+      "typeVersion": 1,
+      "position": [
+        3600,
+        320
+      ],
+      "credentials": {
+        "dropboxOAuth2Api": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Dropbox account"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "executeOnce": true,
+        "command": "=rm -f \"/files/tmp/{{ $json.original_name }}\" 2>/dev/null || true"
+      },
+      "id": "5f57e72d-1e50-4e11-8fae-9759ad50b5f0",
+      "name": "Cleanup Temp1",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        4040,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "executeOnce": true,
+        "command": "=echo '{{ JSON.stringify({ timestamp: $now.toISO(), file: $json.name || \"unknown\", status: \"skipped\", reason: \"duplicate\" }) }}' >> /files/logs/genre_detection.jsonl"
+      },
+      "id": "1476c475-12ed-4e7b-8d86-685363385e16",
+      "name": "Log Skipped Duplicate1",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        1580,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "curlImport": "",
+        "method": "POST",
+        "url": "https://api.dropboxapi.com/2/files/list_folder",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "dropboxOAuth2Api",
+        "provideSslCertificates": false,
+        "sendQuery": false,
+        "sendHeaders": false,
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "{\"path\":\"/Apps/InflyteAppFiltered\",\"recursive\":true,\"include_media_info\":false,\"include_deleted\":false,\"limit\":2000}",
+        "options": {},
+        "infoMessage": ""
+      },
+      "id": "831bde68-c71f-4212-ac80-f188e27bc5a0",
+      "name": "List Sorted Files (Bulk)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1800,
+        980
+      ],
+      "credentials": {
+        "dropboxOAuth2Api": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Dropbox account"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "curlImport": "",
+        "method": "POST",
+        "url": "https://api.dropboxapi.com/2/files/list_folder",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "dropboxOAuth2Api",
+        "provideSslCertificates": false,
+        "sendQuery": false,
+        "sendHeaders": false,
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ (() => { const p = $json.sourcePathLower.substring(0, $json.sourcePathLower.lastIndexOf('/')); const safe = (p === '/apps/inflyteapp' || p === '') ? '__SAFETY_GUARD_BLOCKED_ROOT_DELETE__' : p; return JSON.stringify({ path: safe }); })() }}",
+        "options": {},
+        "infoMessage": ""
+      },
+      "id": "a1b2c3d4-1111-4a6f-9b8c-list0000folder",
+      "name": "List Source Folder Contents",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2140,
+        840
+      ],
+      "credentials": {
+        "dropboxOAuth2Api": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Dropbox account"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const items = $input.all();\nconst entries = (items[0] && items[0].json && items[0].json.entries) || [];\nconst imageExts = ['.jpg', '.jpeg', '.png', '.gif', '.bmp'];\nconst onlyImagesOrEmpty = entries.every(e => {\n const name = (e.name || '').toLowerCase();\n return imageExts.some(ext => name.endsWith(ext));\n});\nreturn [{\n json: { shouldDeleteFolder: onlyImagesOrEmpty, remainingCount: entries.length, remainingNames: entries.map(e => e.name) }\n}];",
+        "notice": ""
+      },
+      "id": "a1b2c3d4-2222-4a6f-9b8c-check0folderx",
+      "name": "Check If Folder Empty of Audio",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2280,
+        840
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{$json.shouldDeleteFolder}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": false,
+        "options": {}
+      },
+      "id": "a1b2c3d4-3333-4a6f-9b8c-ifshoulddelet",
+      "name": "Should Delete Source Folder?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2420,
+        840
+      ]
+    },
+    {
+      "parameters": {
+        "curlImport": "",
+        "method": "POST",
+        "url": "https://api.dropboxapi.com/2/files/delete_v2",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "dropboxOAuth2Api",
+        "provideSslCertificates": false,
+        "sendQuery": false,
+        "sendHeaders": false,
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ (() => { const p = $('Capture Source Path').item.json.sourcePathLower.substring(0, $('Capture Source Path').item.json.sourcePathLower.lastIndexOf('/')); if (p === '/apps/inflyteapp' || p === '') { throw new Error('SAFETY GUARD: refusing to delete InflyteApp root folder (path resolved to ' + p + ')'); } return JSON.stringify({ path: p }); })() }}",
+        "options": {},
+        "infoMessage": ""
+      },
+      "id": "a1b2c3d4-4444-4a6f-9b8c-deletesrcfold",
+      "name": "Delete Source Folder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2560,
+        760
+      ],
+      "credentials": {
+        "dropboxOAuth2Api": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Dropbox account"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": 3,
+        "unit": "seconds"
+      },
+      "id": "a1b2c3d4-7777-4a6f-9b8c-cleanupwaitxx",
+      "name": "Cleanup Consistency Wait",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "webhookId": "YOUR_WEBHOOK_ID",
+      "position": [
+        2250,
+        910
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ !!$json.error }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              },
+              "id": "8b63d3c1-e828-40a6-8aa0-60aebdc7be70"
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": false,
+        "options": {}
+      },
+      "id": "guard-has-audio-data",
+      "name": "Has Audio Data?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1940,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "executeOnce": false,
+        "command": "=echo '{{ JSON.stringify({ timestamp: $now.toISO(), file: $json.name || $json.original_name || 'unknown', status: 'skipped', reason: 'download_failed', error: ($json.error && $json.error.message) ? $json.error.message : String($json.error || '') }) }}' >> /files/logs/genre_detection.jsonl"
+      },
+      "id": "log-skipped-download-failed",
+      "name": "Log Skipped (Download Failed)",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        2140,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const entries = ($input.first().json.entries) || [];\nreturn entries.map(e => ({ json: e }));",
+        "notice": ""
+      },
+      "id": "flatten-src-entries",
+      "name": "Flatten Source Entries",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const entries = ($input.first().json.entries) || [];\nreturn entries.map(e => ({ json: e }));",
+        "notice": ""
+      },
+      "id": "flatten-dst-entries",
+      "name": "Flatten Sorted Entries",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        980
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const first = $input.first().json;\nreturn [{ json: { entries: first.entries || [], cursor: first.cursor, has_more: first.has_more } }];",
+        "notice": ""
+      },
+      "id": "pg-init-1",
+      "name": "Init Pagination",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-more-cond",
+              "leftValue": "={{ $json.has_more }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "pg-if-1",
+      "name": "Has More Pages?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        900,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "curlImport": "",
+        "method": "POST",
+        "url": "https://api.dropboxapi.com/2/files/list_folder/continue",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "dropboxOAuth2Api",
+        "provideSslCertificates": false,
+        "sendQuery": false,
+        "sendHeaders": false,
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ { cursor: $json.cursor } }}",
+        "options": {},
+        "infoMessage": ""
+      },
+      "id": "pg-continue-1",
+      "name": "List Folder Continue",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        400
+      ],
+      "credentials": {
+        "dropboxOAuth2Api": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Dropbox account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const prevEntries = $('Has More Pages?').item.json.entries || [];\nconst resp = $input.first().json;\nreturn [{ json: { entries: [...prevEntries, ...(resp.entries || [])], cursor: resp.cursor, has_more: resp.has_more } }];",
+        "notice": ""
+      },
+      "id": "pg-accum-1",
+      "name": "Accumulate Entries",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.sourcePathLower.substring(0, $json.sourcePathLower.lastIndexOf('/')) }}",
+              "rightValue": "/apps/inflyteapp",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": false,
+        "options": {}
+      },
+      "id": "has-source-subfolder-check",
+      "name": "Has Source Subfolder?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        870,
+        380
+      ]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Ensure Directories",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Batch Processor": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Rate Limit Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rate Limit Wait": {
+      "main": [
+        [
+          {
+            "node": "Download Audio1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Back for Batch": {
+      "main": [
+        [
+          {
+            "node": "Batch Processor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Handler": {
+      "main": [
+        [
+          {
+            "node": "Log Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook Ingest": {
+      "main": [
+        [
+          {
+            "node": "Ensure Directories",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule (Every 15 min)": {
+      "main": [
+        [
+          {
+            "node": "Ensure Directories",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ensure Directories": {
+      "main": [
+        [
+          {
+            "node": "List Dropbox Files1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "List Sorted Files (Bulk)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Already Processed": {
+      "main": [
+        [
+          {
+            "node": "Skip If Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip If Duplicate": {
+      "main": [
+        [
+          {
+            "node": "Store Original Info",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Skipped Duplicate1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Original Info": {
+      "main": [
+        [
+          {
+            "node": "Batch Processor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Python Genre Detection": {
+      "main": [
+        [
+          {
+            "node": "Parse Python Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Python Output": {
+      "main": [
+        [
+          {
+            "node": "Needs AI Assist?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs AI Assist?": {
+      "main": [
+        [
+          {
+            "node": "Groq Genre Assist",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Skip AI (High Confidence)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Response": {
+      "main": [
+        [
+          {
+            "node": "Resolve Final Genre",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip AI (High Confidence)": {
+      "main": [
+        [
+          {
+            "node": "Resolve Final Genre",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Final Genre": {
+      "main": [
+        [
+          {
+            "node": "Create Genre Folder1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Move to Genre Folder": {
+      "main": [
+        [
+          {
+            "node": "Cleanup Temp1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Has Source Subfolder?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dashboard Webhook": {
+      "main": [
+        [
+          {
+            "node": "Read Log File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Log File": {
+      "main": [
+        [
+          {
+            "node": "Build Dashboard HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Dashboard HTML": {
+      "main": [
+        [
+          {
+            "node": "Respond HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Dropbox Files1": {
+      "main": [
+        [
+          {
+            "node": "Init Pagination",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Audio Files1": {
+      "main": [
+        [
+          {
+            "node": "Check Already Processed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Audio1": {
+      "main": [
+        [
+          {
+            "node": "Has Audio Data?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Temp File1": {
+      "main": [
+        [
+          {
+            "node": "Python Genre Detection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Genre Folder1": {
+      "main": [
+        [
+          {
+            "node": "Move to Genre Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cleanup Temp1": {
+      "main": [
+        [
+          {
+            "node": "Log to JSONL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Source Folder Contents": {
+      "main": [
+        [
+          {
+            "node": "Check If Folder Empty of Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Folder Empty of Audio": {
+      "main": [
+        [
+          {
+            "node": "Should Delete Source Folder?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Delete Source Folder?": {
+      "main": [
+        [
+          {
+            "node": "Delete Source Folder",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Cleanup Consistency Wait": {
+      "main": [
+        [
+          {
+            "node": "List Source Folder Contents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Audio Data?": {
+      "main": [
+        [
+          {
+            "node": "Log Skipped (Download Failed)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Write Temp File1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log to JSONL": {
+      "main": [
+        [
+          {
+            "node": "Loop Back for Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Skipped (Download Failed)": {
+      "main": [
+        [
+          {
+            "node": "Loop Back for Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flatten Source Entries": {
+      "main": [
+        [
+          {
+            "node": "Filter Audio Files1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Sorted Files (Bulk)": {
+      "main": [
+        [
+          {
+            "node": "Flatten Sorted Entries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Genre Assist": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Init Pagination": {
+      "main": [
+        [
+          {
+            "node": "Has More Pages?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has More Pages?": {
+      "main": [
+        [
+          {
+            "node": "List Folder Continue",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Flatten Source Entries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Folder Continue": {
+      "main": [
+        [
+          {
+            "node": "Accumulate Entries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Accumulate Entries": {
+      "main": [
+        [
+          {
+            "node": "Has More Pages?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Source Subfolder?": {
+      "main": [
+        [
+          {
+            "node": "Cleanup Consistency Wait",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "executionTimeout": 3600
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}
