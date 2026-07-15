@@ -4,7 +4,7 @@
 
 Production workflow running self-hosted (n8n on Docker / Synology DS923+).
 
-## What it does
+## What It Does
 Watches a Dropbox folder for incoming audio promos, classifies genre using a
 hybrid strategy, and auto-sorts files with confidence-based routing.
 
@@ -25,3 +25,7 @@ re-auth, path prefix fixes, pagination bugs on large folders, and a
 cleanup-loop re-entrancy bug.
 
 Built and iterated using AI-assisted development (Claude, Groq API tooling).
+
+## Why This Matters
+
+This workflow demonstrates production-style automation design: scheduled and webhook triggers, external API integration, batching, confidence-based routing, error handling, logging, and self-hosted operations.
