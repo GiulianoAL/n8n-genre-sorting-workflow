@@ -1,5 +1,7 @@
 # Advanced Music Genre Sorting - n8n Workflow
 
+![Workflow canvas](workflow-canvas.png)
+
 Production workflow running self-hosted (n8n on Docker / Synology DS923+).
 
 ## What it does
