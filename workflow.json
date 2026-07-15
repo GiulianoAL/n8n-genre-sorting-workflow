@@ -734,7 +734,7 @@
         "sendBody": true,
         "contentType": "json",
         "specifyBody": "json",
-        "jsonBody": "={{ (() => { const p = $json.sourcePathLower.substring(0, $json.sourcePathLower.lastIndexOf('/')); const safe = (p === '/apps/inflyteapp' || p === '') ? '__SAFETY_GUARD_BLOCKED_ROOT_DELETE__' : p; return JSON.stringify({ path: safe }); })() }}",
+        "jsonBody": "=={{ (() => { const p = $('Resolve Final Genre').item.json.original_path.substring(0, $('Resolve Final Genre').item.json.original_path.lastIndexOf('/')); const safe = (p === '/apps/inflyteapp' || p === '') ? '__SAFETY_GUARD_BLOCKED_ROOT_DELETE__' : p; return JSON.stringify({ path: safe }); })() }}",
         "options": {},
         "infoMessage": ""
       },
@@ -816,7 +816,7 @@
         "sendBody": true,
         "contentType": "json",
         "specifyBody": "json",
-        "jsonBody": "={{ (() => { const p = $('Capture Source Path').item.json.sourcePathLower.substring(0, $('Capture Source Path').item.json.sourcePathLower.lastIndexOf('/')); if (p === '/apps/inflyteapp' || p === '') { throw new Error('SAFETY GUARD: refusing to delete InflyteApp root folder (path resolved to ' + p + ')'); } return JSON.stringify({ path: p }); })() }}",
+        "jsonBody": "=={{ (() => { const p = $('Resolve Final Genre').item.json.original_path.substring(0, $('Resolve Final Genre').item.json.original_path.lastIndexOf('/')); if (p === '/apps/inflyteapp' || p === '') { throw new Error('SAFETY GUARD: refusing to delete InflyteApp root folder (path resolved to ' + p + ')'); } return JSON.stringify({ path: p }); })() }}",
         "options": {},
         "infoMessage": ""
       },
@@ -848,8 +848,8 @@
       "typeVersion": 1.1,
       "webhookId": "YOUR_WEBHOOK_ID",
       "position": [
-        2250,
-        910
+        2260,
+        920
       ]
     },
     {
@@ -1039,12 +1039,13 @@
           },
           "conditions": [
             {
-              "leftValue": "={{ $json.sourcePathLower.substring(0, $json.sourcePathLower.lastIndexOf('/')) }}",
+              "leftValue": "={{ $('Resolve Final Genre').item.json.original_path.substring(0, $('Resolve Final Genre').item.json.original_path.lastIndexOf('/')) }}",
               "rightValue": "/apps/inflyteapp",
               "operator": {
                 "type": "string",
                 "operation": "notEquals"
-              }
+              },
+              "id": "92985014-b7c1-4bfe-8831-a587f1b66716"
             }
           ],
           "combinator": "and"
@@ -1057,7 +1058,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        870,
+        880,
         380
       ]
     }
